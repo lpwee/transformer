@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 
@@ -34,11 +35,24 @@ def train_bpe(
     vocab = {i: bytes([i]) for i in range(256)}
     merges = []
 
-    while len(vocab) < vocab_size:
+    special_tokens = special_tokens or []
+    if special_tokens:
+        ordered = sorted((t.encode("utf-8") for t in special_tokens), key=len, reverse=True)
+        pattern = b"|".join(re.escape(s) for s in ordered)
+        segments = [list(chunk) for chunk in re.split(pattern, corpus) if chunk]
+    else:
+        segments = [list(corpus)]
+
+    merge_target = vocab_size - len(special_tokens)
+    while len(vocab) < merge_target:
         c = Counter()
-        for pair in zip(corpus[:-1],corpus[1:]):
-            c[pair] += 1
-        
+        for seg in segments:
+            for pair in zip(seg[:-1], seg[1:]):
+                c[pair] += 1
+
+        if not c:
+            break
+
         most_freq = min(c.items(), key=lambda x:(-x[1], x[0]))
         new_pair = most_freq[0]
 
@@ -46,19 +60,24 @@ def train_bpe(
         vocab[new_entry_id] = vocab[new_pair[0]] + vocab[new_pair[1]]
         merges.append(new_pair)
 
-        i, n = 0, len(corpus)
-        new_corpus = []
-        while i < n:
-            if i < n-1 and (corpus[i], corpus[i+1]) == new_pair:
-                new_corpus.append(new_entry_id)
-                i += 2
-            else:
-                new_corpus.append(corpus[i])
-                i += 1
-        corpus = new_corpus
-    
+        new_segments = []
+        for seg in segments:
+            i, n = 0, len(seg)
+            new_seg = []
+            while i < n:
+                if i < n-1 and (seg[i], seg[i+1]) == new_pair:
+                    new_seg.append(new_entry_id)
+                    i += 2
+                else:
+                    new_seg.append(seg[i])
+                    i += 1
+            new_segments.append(new_seg)
+        segments = new_segments
+
+    for token in special_tokens:
+        vocab[len(vocab)] = token.encode("utf-8")
+
     return vocab, merges
-    # raise NotImplementedError("TODO: Implement train_bpe()")
 
 
 class BPETokenizer:
