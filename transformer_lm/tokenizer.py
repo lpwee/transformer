@@ -28,7 +28,37 @@ def train_bpe(
         vocab: ``dict[int, bytes]`` mapping token ID to byte string.
         merges: ``list[tuple[int, int]]`` merge pairs in order.
     """
-    raise NotImplementedError("TODO: Implement train_bpe()")
+    with open(input_path, "rb") as f:
+        corpus = f.read()
+
+    vocab = {i: bytes([i]) for i in range(256)}
+    merges = []
+
+    while len(vocab) < vocab_size:
+        c = Counter()
+        for pair in zip(corpus[:-1],corpus[1:]):
+            c[pair] += 1
+        
+        most_freq = min(c.items(), key=lambda x:(-x[1], x[0]))
+        new_pair = most_freq[0]
+
+        new_entry_id = len(vocab)
+        vocab[new_entry_id] = vocab[new_pair[0]] + vocab[new_pair[1]]
+        merges.append(new_pair)
+
+        i, n = 0, len(corpus)
+        new_corpus = []
+        while i < n:
+            if i < n-1 and (corpus[i], corpus[i+1]) == new_pair:
+                new_corpus.append(new_entry_id)
+                i += 2
+            else:
+                new_corpus.append(corpus[i])
+                i += 1
+        corpus = new_corpus
+    
+    return vocab, merges
+    # raise NotImplementedError("TODO: Implement train_bpe()")
 
 
 class BPETokenizer:
