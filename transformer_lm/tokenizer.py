@@ -79,7 +79,6 @@ def train_bpe(
 
     return vocab, merges
 
-
 class BPETokenizer:
     """Byte-level BPE tokenizer."""
 
@@ -89,12 +88,52 @@ class BPETokenizer:
         merges: list[tuple[int, int]],
         special_tokens: list[str] | None = None,
     ) -> None:
-        raise NotImplementedError("TODO: Implement BPETokenizer.__init__()")
+        self.vocab = vocab
+        self.merges = merges
+        self.special_tokens = special_tokens
 
     def encode(self, text: str) -> list[int]:
         """Encode a string into a list of token IDs."""
-        raise NotImplementedError("TODO: Implement encode()")
+        special_tokens = self.special_tokens or []
+        bytes_to_id = {b: i for i, b in self.vocab.items()}
+
+        if special_tokens:
+            ordered = sorted(special_tokens, key=len, reverse=True)
+            pattern = "(" + "|".join(re.escape(s) for s in ordered) + ")"
+            parts = re.split(pattern, text)
+        else:
+            parts = [text]
+
+        special_set = set(special_tokens)
+        result: list[int] = []
+        for part in parts:
+            if not part:
+                continue
+            if part in special_set:
+                result.append(bytes_to_id[part.encode("utf-8")])
+                continue
+
+            tokens = list(part.encode("utf-8"))
+            for pair in self.merges:
+                new_id = bytes_to_id[self.vocab[pair[0]] + self.vocab[pair[1]]]
+                new_tokens: list[int] = []
+                j, n = 0, len(tokens)
+                while j < n:
+                    if j + 1 < n and tokens[j] == pair[0] and tokens[j + 1] == pair[1]:
+                        new_tokens.append(new_id)
+                        j += 2
+                    else:
+                        new_tokens.append(tokens[j])
+                        j += 1
+                tokens = new_tokens
+
+            result.extend(tokens)
+
+        return result
 
     def decode(self, ids: list[int]) -> str:
         """Decode a list of token IDs back into a string."""
-        raise NotImplementedError("TODO: Implement decode()")
+        tokens = b"".join(self.vocab[i] for i in ids)
+        text = tokens.decode("utf-8", errors="replace")
+
+        return text
