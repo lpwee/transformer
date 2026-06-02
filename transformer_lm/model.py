@@ -28,10 +28,20 @@ class Linear(nn.Module):
         self, in_features: int, out_features: int, bias: bool = True
     ) -> None:
         super().__init__()
-        raise NotImplementedError("TODO: Implement Linear.__init__()")
+        
+        bound = 1 / math.sqrt(in_features)
+        weight = torch.empty(out_features, in_features).uniform_(-bound, bound)
+        self.weight = nn.Parameter(weight)
+        if bias:
+            self.bias = nn.Parameter(torch.zeros(out_features))
+        else:
+            self.bias = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("TODO: Implement Linear.forward()")
+        res = x @ self.weight.t()
+        if self.bias is not None:
+            res = res + self.bias
+        return res 
 
 
 class Embedding(nn.Module):
@@ -42,21 +52,23 @@ class Embedding(nn.Module):
 
     def __init__(self, num_embeddings: int, embedding_dim: int) -> None:
         super().__init__()
-        raise NotImplementedError("TODO: Implement Embedding.__init__()")
+        weight = torch.empty(num_embeddings, embedding_dim).normal_(0, 0.02)
+        self.weight = nn.Parameter(weight)
 
     def forward(self, indices: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("TODO: Implement Embedding.forward()")
-
+        return self.weight[indices]
 
 class RMSNorm(nn.Module):
     """Root Mean Square Layer Normalization (no learnable parameters)."""
 
     def __init__(self, d_model: int, eps: float = 1e-5) -> None:
         super().__init__()
-        raise NotImplementedError("TODO: Implement RMSNorm.__init__()")
+        self.eps = eps
+        self.d_model = d_model
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("TODO: Implement RMSNorm.forward()")
+        rms = torch.sqrt(x.square().mean(dim=-1, keepdim=True) + self.eps)
+        return x / rms
 
 
 # ---------------------------------------------------------------------------
