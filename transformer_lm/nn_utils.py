@@ -17,8 +17,10 @@ def softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
     Returns:
         Tensor of the same shape summing to 1 along ``dim``.
     """
-    raise NotImplementedError("TODO: Implement softmax()")
-
+    max_x = x.max(dim=dim, keepdim=True).values
+    top = torch.exp(x - max_x)
+    bot = torch.exp(x - max_x).sum(dim=dim, keepdim=True)
+    return top / bot
 
 def silu(x: torch.Tensor) -> torch.Tensor:
     """Sigmoid Linear Unit (SiLU / Swish) activation.
@@ -29,7 +31,7 @@ def silu(x: torch.Tensor) -> torch.Tensor:
     Returns:
         Tensor of the same shape.
     """
-    raise NotImplementedError("TODO: Implement silu()")
+    return x * torch.sigmoid(x)
 
 
 def cross_entropy_loss(
@@ -44,4 +46,5 @@ def cross_entropy_loss(
     Returns:
         Scalar mean cross-entropy loss.
     """
+    
     raise NotImplementedError("TODO: Implement cross_entropy_loss()")
