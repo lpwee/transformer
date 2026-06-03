@@ -156,8 +156,13 @@ def scaled_dot_product_attention(
     Returns:
         ``(B, ..., T, d_v)``
     """
-    raise NotImplementedError("TODO: Implement scaled_dot_product_attention()")
-
+    d_k = K.shape[-1]
+    scores = Q @ K.transpose(-2,-1) / math.sqrt(d_k)
+    if mask is not None:
+        scores = scores + mask
+    weights = softmax(scores, dim=-1)
+    return weights @ V
+    
 
 class CausalMultiHeadSelfAttention(nn.Module):
     """Multi-head self-attention with a causal mask and RoPE.
@@ -185,7 +190,17 @@ class CausalMultiHeadSelfAttention(nn.Module):
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        raise NotImplementedError("TODO: Implement CausalMultiHeadSelfAttention.__init__()")
+        assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
+        d_head = d_model // n_heads
+        assert d_head % 2 == 0, "d_model // n_heads must be even (RoPE pairs)"
+
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_head = d_head
+
+        self.qkv_proj = Linear(d_model, 3 * d_model, bias=False)
+        self.o_proj = Linear(d_model, d_model, bias=False)
+        self.rope = RotaryPositionEmbedding(d_head)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -194,7 +209,25 @@ class CausalMultiHeadSelfAttention(nn.Module):
         Returns:
             ``(B, T, d_model)``
         """
-        raise NotImplementedError("TODO: Implement CausalMultiHeadSelfAttention.forward()")
+        B, T, _ = x.shape
+        qkv = self.qkv_proj(x)  # (B, T, 3*d_model)
+        Q, K, V = qkv.split(self.d_model, dim=-1)
+
+        # (B, T, d_model) -> (B, n_heads, T, d_head)
+        Q = Q.view(B, T, self.n_heads, self.d_head).transpose(1, 2)
+        K = K.view(B, T, self.n_heads, self.d_head).transpose(1, 2)
+        V = V.view(B, T, self.n_heads, self.d_head).transpose(1, 2)
+
+        Q, K = self.rope(Q, K)
+
+        mask = torch.triu(
+            torch.full((T, T), float("-inf"), device=x.device, dtype=x.dtype),
+            diagonal=1,
+        )
+        attn = scaled_dot_product_attention(Q, K, V, mask)  # (B, n_heads, T, d_head)
+
+        attn = attn.transpose(1, 2).contiguous().view(B, T, self.d_model)
+        return self.o_proj(attn)
 
 
 # ---------------------------------------------------------------------------
