@@ -256,10 +256,13 @@ class FeedForward(nn.Module):
         self, d_model: int, d_ff: int, dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        raise NotImplementedError("TODO: Implement FeedForward.__init__()")
+        self.w_gate = Linear(d_model, d_ff, bias=False)
+        self.w_up   = Linear(d_model, d_ff, bias=False)
+        self.w_down = Linear(d_ff, d_model, bias=False)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("TODO: Implement FeedForward.forward()")
+        return self.dropout(self.w_down(silu(self.w_gate(x)) * self.w_up(x)))
 
 
 # ---------------------------------------------------------------------------
@@ -296,10 +299,17 @@ class TransformerBlock(nn.Module):
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        raise NotImplementedError("TODO: Implement TransformerBlock.__init__()")
+        self.ln1 = RMSNorm(d_model)
+        self.ln2 = RMSNorm(d_model)
+        self.attn = CausalMultiHeadSelfAttention(d_model, n_heads)
+        self.ffn = FeedForward(d_model, d_ff)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("TODO: Implement TransformerBlock.forward()")
+        x = x + self.attn(self.ln1(x))
+        x = x + self.ffn(self.ln2(x))
+
+        return self.dropout(x)
 
 
 class TransformerLM(nn.Module):
@@ -343,7 +353,17 @@ class TransformerLM(nn.Module):
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        raise NotImplementedError("TODO: Implement TransformerLM.__init__()")
+        self.token_emb = Embedding(vocab_size, d_model)
+        self.blocks = nn.ModuleList([TransformerBlock(d_model, n_heads, d_ff, dropout=dropout) for _ in range(n_layers)])
+        
+        self.ln_final = RMSNorm(d_model)
+        self.lm_head = Linear(d_model, vocab_size, bias=False)
+        self.context_length = context_length
+
+        for block in self.blocks:
+            block.attn.o_proj.weight.data.zero_()
+            block.ffn.w_down.weight.data.zero_()
+        self.lm_head.weight = self.token_emb.weight
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         """
@@ -352,4 +372,20 @@ class TransformerLM(nn.Module):
         Returns:
             ``(B, T, vocab_size)`` raw logits.
         """
+        if input_ids.shape[1] > self.context_length:
+            raise AssertionError("Input sequence longer than context length")
+        
+        x = self.token_emb(input_ids)
+        for block in self.blocks:
+            x = block(x)
+        x = self.ln_final(x)
+
+        return self.lm_head(x)
+        
+        
+
+        
+
+        
+
         raise NotImplementedError("TODO: Implement TransformerLM.forward()")
