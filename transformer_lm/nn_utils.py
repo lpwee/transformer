@@ -46,5 +46,10 @@ def cross_entropy_loss(
     Returns:
         Scalar mean cross-entropy loss.
     """
-    
-    raise NotImplementedError("TODO: Implement cross_entropy_loss()")
+    B, T, V = logits.shape
+
+    m = logits.max(dim=-1, keepdim=True).values
+    logsumexp = m.squeeze(-1) + torch.exp(logits - m).sum(dim=-1)
+    target_logits = logits.gather(dim=-1, index=targets.unsqueeze(-1)).squeeze(-1)
+    per_position = logsumexp - target_logits
+    return per_position.mean()
