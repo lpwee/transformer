@@ -201,6 +201,7 @@ class CausalMultiHeadSelfAttention(nn.Module):
         self.qkv_proj = Linear(d_model, 3 * d_model, bias=False)
         self.o_proj = Linear(d_model, d_model, bias=False)
         self.rope = RotaryPositionEmbedding(d_head)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -227,7 +228,7 @@ class CausalMultiHeadSelfAttention(nn.Module):
         attn = scaled_dot_product_attention(Q, K, V, mask)  # (B, n_heads, T, d_head)
 
         attn = attn.transpose(1, 2).contiguous().view(B, T, self.d_model)
-        return self.o_proj(attn)
+        return self.dropout(self.o_proj(attn))
 
 
 # ---------------------------------------------------------------------------
