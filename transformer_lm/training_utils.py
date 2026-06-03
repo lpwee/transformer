@@ -24,7 +24,18 @@ def get_batch(
     Returns:
         ``(x, y)`` both of shape ``(batch_size, context_length)``.
     """
-    raise NotImplementedError("TODO: Implement get_batch()")
+    n = data.shape[0]
+    if n - context_length < 1:
+        raise ValueError(
+            f"data length ({n}) must exceed context_length ({context_length})"
+        )
+
+    starts = torch.randint(0, n - context_length, (batch_size,))
+    offsets = torch.arange(context_length)
+    idx = starts.unsqueeze(1) + offsets.unsqueeze(0)  # (B, T)
+    x = data[idx].to(device=device, dtype=torch.long)
+    y = data[idx + 1].to(device=device, dtype=torch.long)
+    return x, y
 
 
 @torch.no_grad()
@@ -47,4 +58,15 @@ def generate(
     Returns:
         List of token IDs (prompt + generated).
     """
-    raise NotImplementedError("TODO: Implement generate()")
+    if context_length is None:
+        context_length = model.context_length
+
+    ids = list(prompt_ids)
+    device = next(model.parameters()).device
+    for _ in range(max_new_tokens):
+        ctx = torch.tensor(ids[-context_length:], dtype=torch.long, device=device).unsqueeze(0)
+        logits = model(ctx)[:, -1, :] / temperature  # (1, V)
+        probs = softmax(logits, dim=-1)
+        next_id = torch.multinomial(probs, num_samples=1).item()
+        ids.append(int(next_id))
+    return ids
