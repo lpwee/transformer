@@ -3,17 +3,11 @@
 # configurable here — they are enforced by the training script and autograder.
 #
 # Priority: CLI args > config.yaml > TrainConfig defaults
-#
-# Tuned config — best local val loss 1.388 (seed 42, 5000 steps, bf16/CUDA).
-# Chosen via a wave-by-wave sweep (see TUNING_LOG.md). Key levers, in order of
-# impact: learning rate, batch size (= tokens seen at fixed steps), head
-# dimension (n_heads=6 -> d_head=16 beat 8 and 4), cosine anneal to a low floor.
-# Params: 512*96 + 4*(4*96^2 + 3*96*256) = 491,520  (< 500K cap).
 
 # Architecture (tunable — must satisfy constraints in assignment.pdf)
 d_model: 96
 n_layers: 4
-n_heads: 6          # d_head = 96/6 = 16 (even, RoPE-valid)
+n_heads: 6          
 d_ff: 256
 dropout: 0.0
 
